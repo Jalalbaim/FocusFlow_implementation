@@ -1,0 +1,11 @@
+venv/
+.env
+__pycache__/
+utils/__pycache__/
+outputs_eval/
+
+data/data_pose/
+
+data/data_background/
+
+checkpoint/
