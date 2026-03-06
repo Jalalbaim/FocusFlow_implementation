@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--drop_t5", action="store_true")
 
     # Common trajectory
-    parser.add_argument("--T", type=int, default=50)
+    parser.add_argument("--T", type=int, default=60)
 
     # FlowEdit params
     parser.add_argument("--flowedit_nmax", type=int, default=33)
@@ -63,11 +63,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--flowedit_cfg_tar", type=float, default=16.5)
 
     # FocusFlow params
-    parser.add_argument("--focus_nmax", type=int, default=50)
-    parser.add_argument("--focus_nmin", type=int, default=10)
+    parser.add_argument("--focus_nmax", type=int, default=60)
+    parser.add_argument("--focus_nmin", type=int, default=15)
     parser.add_argument("--focus_navg", type=int, default=4)
-    parser.add_argument("--focus_cfg_src", type=float, default=1.5)
-    parser.add_argument("--focus_cfg_tar", type=float, default=19.5)
+    parser.add_argument("--focus_cfg_src", type=float, default=3.5)
+    parser.add_argument("--focus_cfg_tar", type=float, default=21.5)
     parser.add_argument("--focus_negative_prompt", type=str, default="")
 
     # FocusFlow mask params
