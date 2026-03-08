@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 import os
 from huggingface_hub import login
 
+from tqdm import tqdm
+
 # Charger les variables d'environnement
 load_dotenv()
 
@@ -295,19 +297,21 @@ def create_diffedit_mask_sd3(
 
 @torch.no_grad()
 def focusflow(
-    pipe: StableDiffusion3Pipeline,
+    pipe,
+    scheduler,
+    retrieve_timesteps_fn,
     x_src: torch.Tensor,
-    prompt_src: str,
-    prompt_tar: str,
-    negative_prompt: str = "",
+    src_prompt: str,
+    tar_prompt: str,
+    negative_prompt: str,
     T_steps: int = 50,
     n_avg: int = 1,
     src_guidance_scale: float = 3.5,
     tar_guidance_scale: float = 13.5,
     n_min: int = 0,
     n_max: int = 15,
-    # mask options
-    mask_soft_hw: Optional[torch.Tensor] = None,  # (H,W) in [0,1]
+    # mask options:
+    mask_soft_hw: Optional[torch.Tensor] = None,  # (H,W) in [0,1] or None
     auto_mask: bool = True,
     mask_strength: float = 0.5,
     mask_n: int = 10,
@@ -319,69 +323,62 @@ def focusflow(
     mask_q_high: float = 0.99,
     mask_seed_base: int = 0,
 ):
-    """
-    FocusFlow = masked FlowEdit for SD3:
-      - If mask_soft_hw is None and auto_mask=True, builds a DiffEdit-style mask from velocity differences.
-      - ODE-like phase (T_steps-n_max .. T_steps-n_min): integrates masked delta velocity.
-      - Sampling-like phase (last n_min steps): blends v_tar inside mask and v_src outside mask.
-    """
     device = x_src.device
 
-    # Scheduler: use the same class as SD3 FlowEdit implementations.
-    scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config)
-    timesteps, T_steps = retrieve_timesteps(scheduler, T_steps, device, timesteps=None)
+    timesteps, T_steps = retrieve_timesteps_fn(scheduler, T_steps, device, timesteps=None)
     pipe._num_timesteps = len(timesteps)
 
-    # Ensure CFG is active for the batched prompt embedding logic.
-    pipe._guidance_scale = float(max(src_guidance_scale, tar_guidance_scale, mask_guidance, 1.0001))
-
+    # prompt embeds for main edit
     src_tar_prompt_embeds, src_tar_pooled_prompt_embeds = _encode_prompts_sd3(
         pipe=pipe,
         device=device,
-        src_prompt=prompt_src,
-        tar_prompt=prompt_tar,
+        src_prompt=src_prompt,
+        tar_prompt=tar_prompt,
         negative_prompt=negative_prompt,
-        src_guidance_scale=float(src_guidance_scale),
-        tar_guidance_scale=float(tar_guidance_scale),
+        src_guidance_scale=src_guidance_scale,
+        tar_guidance_scale=tar_guidance_scale,
     )
 
+    # mask generation
     print("Mask generation...")
     if mask_soft_hw is None and auto_mask:
         mask_soft_hw, mask_bin_hw, _ = create_diffedit_mask_sd3(
             pipe=pipe,
             scheduler=scheduler,
             x_src=x_src,
-            src_prompt=prompt_src,
-            tar_prompt=prompt_tar,
+            src_prompt=src_prompt,
+            tar_prompt=tar_prompt,
             negative_prompt=negative_prompt,
+            retrieve_timesteps_fn=retrieve_timesteps_fn,
             T_steps=T_steps,
-            strength=float(mask_strength),
-            n=int(mask_n),
-            guidance_mask=float(mask_guidance),
-            q_low=float(mask_q_low),
-            q_high=float(mask_q_high),
-            threshold=float(mask_threshold),
-            blur_ks=int(mask_blur_ks),
-            dilate_ks=int(mask_dilate_ks),
-            seed_base=int(mask_seed_base),
+            strength=mask_strength,
+            n=mask_n,
+            guidance_mask=mask_guidance,
+            q_low=mask_q_low,
+            q_high=mask_q_high,
+            threshold=mask_threshold,
+            blur_ks=mask_blur_ks,
+            dilate_ks=mask_dilate_ks,
+            seed_base=mask_seed_base,
         )
     elif mask_soft_hw is None:
         mask_bin_hw = None
     else:
         if not torch.is_tensor(mask_soft_hw):
             mask_soft_hw = torch.tensor(mask_soft_hw)
-        mask_bin_hw = (mask_soft_hw >= float(mask_threshold)).to(torch.uint8)
+        mask_bin_hw = (mask_soft_hw >= mask_threshold).to(torch.uint8)
 
     M = None
     if mask_soft_hw is not None:
         M = _prep_mask_for_latents(mask_soft_hw.to(device=device), x_src)
 
-    print("FocusFlow (masked FlowEdit)")
+    # init ODE path
+    print("MaskedFlowEdit (Velocity Blending Mode)")
     zt_edit = x_src.clone()
 
-    # Main integration loop (faithful to the notebook logic).
-    for i, t in enumerate(timesteps):
-        if T_steps - i > int(n_max):
+    for i, t in tqdm(list(enumerate(timesteps)), desc="FlowEditSD3_masked"):
+        # Skip steps before n_max
+        if T_steps - i > n_max:
             continue
 
         t_i = t / 1000
@@ -390,52 +387,58 @@ def focusflow(
         else:
             t_im1 = torch.zeros_like(t_i).to(t_i.device)
 
-        if T_steps - i > int(n_min):
-            # ODE phase: masked delta velocity
-            V_delta_avg = torch.zeros_like(x_src)
+        if T_steps - i > n_min:
+            # --- ODE phase: Blended Velocity ---
+            V_blend_avg = torch.zeros_like(x_src)
 
-            for _ in range(int(n_avg)):
+            for _ in range(n_avg):
                 fwd_noise = torch.randn_like(x_src)
 
+                # Construct source and target trajectories
                 zt_src = (1 - t_i) * x_src + t_i * fwd_noise
                 zt_tar = zt_edit + zt_src - x_src
 
-                latent_in = torch.cat([zt_src, zt_src, zt_tar, zt_tar], dim=0)
+                latent_in = torch.cat([zt_src, zt_src, zt_tar, zt_tar], dim=0) if pipe.do_classifier_free_guidance else (zt_src, zt_tar)
                 Vt_src, Vt_tar = calc_v_sd3(
                     pipe,
                     latent_in,
                     src_tar_prompt_embeds,
                     src_tar_pooled_prompt_embeds,
-                    float(src_guidance_scale),
-                    float(tar_guidance_scale),
+                    src_guidance_scale,
+                    tar_guidance_scale,
                     t,
                 )
 
-                delta = (Vt_tar - Vt_src)
+                # Apply Velocity Blending instead of Delta
                 if M is not None:
-                    delta = M * delta
+                    v_step = M * Vt_tar + (1 - M) * Vt_src
+                else:
+                    v_step = Vt_tar
 
-                V_delta_avg += delta / float(n_avg)
+                V_blend_avg += v_step / float(n_avg)
 
+            # Euler step for zt_edit
             zt_edit = zt_edit.to(torch.float32)
-            zt_edit = zt_edit + (t_im1 - t_i) * V_delta_avg.to(torch.float32)
+            zt_edit = zt_edit + (t_im1 - t_i) * V_blend_avg.to(torch.float32)
             zt_edit = zt_edit.to(dtype=x_src.dtype)
 
         else:
-            # sampling-like phase: blend velocities
-            if i == T_steps - int(n_min):
+            # --- Sampling phase: Blend velocities ---
+            if i == T_steps - n_min:
                 fwd_noise = torch.randn_like(x_src)
                 xt_src = scale_noise(scheduler, x_src, t, noise=fwd_noise)
                 xt_tar = zt_edit + xt_src - x_src
+            else:
+                xt_tar = xt_tar # Carry over from previous iteration
 
-            latent_in = torch.cat([xt_tar, xt_tar, xt_tar, xt_tar], dim=0)
+            latent_in = torch.cat([xt_tar, xt_tar, xt_tar, xt_tar], dim=0) if pipe.do_classifier_free_guidance else xt_tar
             Vt_src, Vt_tar = calc_v_sd3(
                 pipe,
                 latent_in,
                 src_tar_prompt_embeds,
                 src_tar_pooled_prompt_embeds,
-                float(src_guidance_scale),
-                float(tar_guidance_scale),
+                src_guidance_scale,
+                tar_guidance_scale,
                 t,
             )
 
@@ -446,10 +449,164 @@ def focusflow(
 
             xt_tar = xt_tar.to(torch.float32)
             xt_tar = (xt_tar + (t_im1 - t_i) * V_final.to(torch.float32)).to(dtype=x_src.dtype)
-            #xt_tar = (xt_tar + (t_im1 - t_i) * (V_final - Vt_src).to(torch.float32)).to(dtype=x_src.dtype)
 
-    out_latents = zt_edit if int(n_min) == 0 else xt_tar
-    return out_latents, mask_soft_hw, mask_bin_hw
+    out = zt_edit if n_min == 0 else xt_tar
+    return out, mask_soft_hw, mask_bin_hw
+# def focusflow(
+#     pipe: StableDiffusion3Pipeline,
+#     x_src: torch.Tensor,
+#     prompt_src: str,
+#     prompt_tar: str,
+#     negative_prompt: str = "",
+#     T_steps: int = 50,
+#     n_avg: int = 1,
+#     src_guidance_scale: float = 3.5,
+#     tar_guidance_scale: float = 13.5,
+#     n_min: int = 0,
+#     n_max: int = 15,
+#     # mask options
+#     mask_soft_hw: Optional[torch.Tensor] = None,  # (H,W) in [0,1]
+#     auto_mask: bool = True,
+#     mask_strength: float = 0.5,
+#     mask_n: int = 10,
+#     mask_guidance: float = 5.0,
+#     mask_blur_ks: int = 5,
+#     mask_dilate_ks: int = 0,
+#     mask_threshold: float = 0.5,
+#     mask_q_low: float = 0.01,
+#     mask_q_high: float = 0.99,
+#     mask_seed_base: int = 0,
+# ):
+#     """
+#     FocusFlow = masked FlowEdit for SD3:
+#       - If mask_soft_hw is None and auto_mask=True, builds a DiffEdit-style mask from velocity differences.
+#       - ODE-like phase (T_steps-n_max .. T_steps-n_min): integrates masked delta velocity.
+#       - Sampling-like phase (last n_min steps): blends v_tar inside mask and v_src outside mask.
+#     """
+#     device = x_src.device
+
+#     # Scheduler: use the same class as SD3 FlowEdit implementations.
+#     scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config)
+#     timesteps, T_steps = retrieve_timesteps(scheduler, T_steps, device, timesteps=None)
+#     pipe._num_timesteps = len(timesteps)
+
+#     # Ensure CFG is active for the batched prompt embedding logic.
+#     pipe._guidance_scale = float(max(src_guidance_scale, tar_guidance_scale, mask_guidance, 1.0001))
+
+#     src_tar_prompt_embeds, src_tar_pooled_prompt_embeds = _encode_prompts_sd3(
+#         pipe=pipe,
+#         device=device,
+#         src_prompt=prompt_src,
+#         tar_prompt=prompt_tar,
+#         negative_prompt=negative_prompt,
+#         src_guidance_scale=float(src_guidance_scale),
+#         tar_guidance_scale=float(tar_guidance_scale),
+#     )
+
+#     print("Mask generation...")
+#     if mask_soft_hw is None and auto_mask:
+#         mask_soft_hw, mask_bin_hw, _ = create_diffedit_mask_sd3(
+#             pipe=pipe,
+#             scheduler=scheduler,
+#             x_src=x_src,
+#             src_prompt=prompt_src,
+#             tar_prompt=prompt_tar,
+#             negative_prompt=negative_prompt,
+#             T_steps=T_steps,
+#             strength=float(mask_strength),
+#             n=int(mask_n),
+#             guidance_mask=float(mask_guidance),
+#             q_low=float(mask_q_low),
+#             q_high=float(mask_q_high),
+#             threshold=float(mask_threshold),
+#             blur_ks=int(mask_blur_ks),
+#             dilate_ks=int(mask_dilate_ks),
+#             seed_base=int(mask_seed_base),
+#         )
+#     elif mask_soft_hw is None:
+#         mask_bin_hw = None
+#     else:
+#         if not torch.is_tensor(mask_soft_hw):
+#             mask_soft_hw = torch.tensor(mask_soft_hw)
+#         mask_bin_hw = (mask_soft_hw >= float(mask_threshold)).to(torch.uint8)
+
+#     M = None
+#     if mask_soft_hw is not None:
+#         M = _prep_mask_for_latents(mask_soft_hw.to(device=device), x_src)
+
+#     print("FocusFlow (masked FlowEdit)")
+#     zt_edit = x_src.clone()
+
+#     # Main integration loop (faithful to the notebook logic).
+#     for i, t in enumerate(timesteps):
+#         if T_steps - i > int(n_max):
+#             continue
+
+#         t_i = t / 1000
+#         if i + 1 < len(timesteps):
+#             t_im1 = timesteps[i + 1] / 1000
+#         else:
+#             t_im1 = torch.zeros_like(t_i).to(t_i.device)
+
+#         if T_steps - i > int(n_min):
+#             # ODE phase: masked delta velocity
+#             V_delta_avg = torch.zeros_like(x_src)
+
+#             for _ in range(int(n_avg)):
+#                 fwd_noise = torch.randn_like(x_src)
+
+#                 zt_src = (1 - t_i) * x_src + t_i * fwd_noise
+#                 zt_tar = zt_edit + zt_src - x_src
+
+#                 latent_in = torch.cat([zt_src, zt_src, zt_tar, zt_tar], dim=0)
+#                 Vt_src, Vt_tar = calc_v_sd3(
+#                     pipe,
+#                     latent_in,
+#                     src_tar_prompt_embeds,
+#                     src_tar_pooled_prompt_embeds,
+#                     float(src_guidance_scale),
+#                     float(tar_guidance_scale),
+#                     t,
+#                 )
+
+#                 delta = (Vt_tar - Vt_src)
+#                 if M is not None:
+#                     delta = M * delta
+
+#                 V_delta_avg += delta / float(n_avg)
+
+#             zt_edit = zt_edit.to(torch.float32)
+#             zt_edit = zt_edit + (t_im1 - t_i) * V_delta_avg.to(torch.float32)
+#             zt_edit = zt_edit.to(dtype=x_src.dtype)
+
+#         else:
+#             # sampling-like phase: blend velocities
+#             if i == T_steps - int(n_min):
+#                 fwd_noise = torch.randn_like(x_src)
+#                 xt_src = scale_noise(scheduler, x_src, t, noise=fwd_noise)
+#                 xt_tar = zt_edit + xt_src - x_src
+
+#             latent_in = torch.cat([xt_tar, xt_tar, xt_tar, xt_tar], dim=0)
+#             Vt_src, Vt_tar = calc_v_sd3(
+#                 pipe,
+#                 latent_in,
+#                 src_tar_prompt_embeds,
+#                 src_tar_pooled_prompt_embeds,
+#                 float(src_guidance_scale),
+#                 float(tar_guidance_scale),
+#                 t,
+#             )
+
+#             if M is None:
+#                 V_final = Vt_tar
+#             else:
+#                 V_final = M * Vt_tar + (1 - M) * Vt_src
+
+#             xt_tar = xt_tar.to(torch.float32)
+#             xt_tar = (xt_tar + (t_im1 - t_i) * V_final.to(torch.float32)).to(dtype=x_src.dtype)
+
+#     out_latents = zt_edit if int(n_min) == 0 else xt_tar
+#     return out_latents, mask_soft_hw, mask_bin_hw
 
 
 def _save_mask_png(mask_hw: torch.Tensor, out_path: str, out_size: int = 512):
