@@ -298,8 +298,6 @@ def create_diffedit_mask_sd3(
 @torch.no_grad()
 def focusflow(
     pipe,
-    scheduler,
-    retrieve_timesteps_fn,
     x_src: torch.Tensor,
     src_prompt: str,
     tar_prompt: str,
@@ -325,7 +323,8 @@ def focusflow(
 ):
     device = x_src.device
 
-    timesteps, T_steps = retrieve_timesteps_fn(scheduler, T_steps, device, timesteps=None)
+    scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config)
+    timesteps, T_steps = retrieve_timesteps(scheduler, T_steps, device, timesteps=None)
     pipe._num_timesteps = len(timesteps)
 
     # prompt embeds for main edit
@@ -349,7 +348,6 @@ def focusflow(
             src_prompt=src_prompt,
             tar_prompt=tar_prompt,
             negative_prompt=negative_prompt,
-            retrieve_timesteps_fn=retrieve_timesteps_fn,
             T_steps=T_steps,
             strength=mask_strength,
             n=mask_n,
@@ -713,8 +711,8 @@ def main():
     out_latents, mask_soft_hw, _ = focusflow(
         pipe=pipe,
         x_src=x_src,
-        prompt_src=args.prompt_src,
-        prompt_tar=args.prompt_tar,
+        src_prompt=args.prompt_src,
+        tar_prompt=args.prompt_tar,
         negative_prompt=args.negative_prompt,
         T_steps=int(args.T),
         n_avg=int(args.navg),

@@ -207,8 +207,8 @@ def _run_focusflow(
     out_latents, mask_soft_hw, _ = focusflow(
         pipe=pipe,
         x_src=x_src,
-        prompt_src=case.source_prompt,
-        prompt_tar=case.target_prompt,
+        src_prompt=case.source_prompt,
+        tar_prompt=case.target_prompt,
         negative_prompt=args.focus_negative_prompt,
         T_steps=args.T,
         n_avg=args.focus_navg,
