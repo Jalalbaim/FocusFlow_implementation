@@ -330,14 +330,30 @@ def main() -> None:
 
             try:
                 mask_soft_hw = None
+                print(f"[info] Executing method: {method}")
                 if method == METHOD_FLOWEDIT:
+                    print("[info] Running FlowEdit...")
                     out_latents = _run_flowedit(pipe, x_src, case, args)
+                    print("[info] FlowEdit finished.")
                 elif method == METHOD_FOCUSFLOW:
+                    print("[info] Running FocusFlow...")
                     out_latents, mask_soft_hw = _run_focusflow(pipe, x_src, case, args)
+                    print(f"[info] FocusFlow finished. mask_soft_hw={'present' if mask_soft_hw is not None else 'None'}")
                 elif method == METHOD_SDEDIT:
+                    print("[info] Running SDEdit...")
                     out_latents = _run_sdedit(pipe, x_src, case, args)
+                    print("[info] SDEdit finished.")
                 else:
                     raise ValueError(f"Unsupported method: {method}")
+
+                if isinstance(out_latents, torch.Tensor):
+                    try:
+                        dev = out_latents.device
+                        print(f"[info] out_latents shape={tuple(out_latents.shape)}, dtype={out_latents.dtype}, device={dev}")
+                    except Exception:
+                        print("[info] out_latents is a tensor (unable to show full details)")
+                else:
+                    print(f"[info] out_latents type: {type(out_latents)}")
 
                 out_img = decode_latents_to_image(pipe, out_latents)
                 out_img.save(output_path)
