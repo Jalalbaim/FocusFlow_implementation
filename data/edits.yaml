@@ -1,66 +1,99 @@
-- input_img: data/imgs/bikes.png
-  source_prompt: A red brick building.
-  target_prompts:
-    - A harley davidson motorcycle parked on the sidewalk in front of a red brick building.
-    - A black brick building.
-  target_codes:
-    - 1_harley_davidson
-    - 2_black_brick
+- input_img: data/imgs/cat_dog_car.png
+  source_prompt: A blue-gray Audi car parked in a grassy area. A white dog sitting on the grass, next to the car. A cat laying on the hood of the car.
 
-- input_img: data/imgs/castle.png
+  target_prompts:
+    - A blue-gray Audi car parked in a grassy area. A Husky dog sitting on the grass, next to the car. A tiger cab laying on the hood of the car.
+    - A wolf sitting on the grass, next to the car.
+    - A wolf laying down next to the car.
+
+  target_codes:
+    - 1_husky_tiger
+    - 2_wolf_no_cat
+    - 3_wolf_laying_no_cat
+
+- input_img: data/imgs/cat_ginger.png
+  source_prompt: An orange and white cat sitting.
+
+  target_prompts:
+    - A tiger sitting.
+    - A cat jumping in the air.
+    - A cat laying down.
+
+  target_codes:
+    - 1_tiger
+    - 2_cat_jumping
+    - 3_cat_laying
+
+- input_img: data/imgs/bear.png
+  source_prompt: A large brown bear walking through a stream of water.
+    The stream appears to be shallow, as the bear is able to walk through it without any difficulty.
+  target_prompts:
+    - A large brown bear sitting in a stream of water. The stream appears to be shallow, as the bear is able to sit in it without any difficulty.
+    - A large brown bear standing on its hind legs in a stream of water. The stream appears to be shallow, as the bear is able to stand in it without any difficulty.
+    - A large brown bear bending down to catch a fish in a stream of water. The stream appears to be shallow, as the bear is able to fish in it without any difficulty.
+  target_codes:
+    - 1_bear_sitting
+    - 2_bear_standing
+    - 3_bear_fishing
+
+- input_img: data/imgs/butterfly.png
+  source_prompt: A beautiful purple flower with a white and black butterfly perched on top of it. The butterfly is positioned towards the left side of the flower.
+  target_prompts:
+    - A beautiful purple flower with a white and black butterfly hovering in mid-air just above it. The butterfly is positioned towards the left side of the flower.
+    - A beautiful purple flower with a white and black butterfly perched on top of it with its wings folded completely shut. The butterfly is positioned towards the left side of the flower.
+  target_codes:
+    - 1_butterfly_hovering
+    - 2_butterfly_wings_closed
+
+- input_img: data/imgs/cat.png
   source_prompt:
-    A majestic castle with a tall, pointed roof, situated on a hillside. The sky above the castle is filled with clouds, creating a dramatic atmosphere.
-    There are several windows on the castle, with some located on the lower levels and others on the upper levels.
+    A small, fluffy kitten sitting in a grassy field. The kitten is positioned in the center of the scene, surrounded by a field.
+    The kitten appears to be looking at something in the field.
   target_prompts:
-    - A majestic castle with a tall, pointed roof, situated on a snowy mountain. The sky above the castle is filled with clouds, creating a dramatic atmosphere. There are several windows on the castle, with some located on the lower levels and others on the upper levels.
-    - A majestic black stone castle with a tall, pointed roof, situated on a hillside. The sky above the castle is filled with clouds, creating a dramatic atmosphere. There are several windows on the castle, with some located on the lower levels and others on the upper levels.
+    - A small, fluffy kitten curled up sleeping in a grassy field. The kitten is positioned in the center of the scene, surrounded by a field.
+    - A small, fluffy kitten mid-pounce in a grassy field. The kitten is positioned in the center of the scene, surrounded by a field.
+    - A small, fluffy kitten rolling on its back in a grassy field. The kitten is positioned in the center of the scene, surrounded by a field.
   target_codes:
-    - 1_snowy_mountain
-    - 2_black_stone
+    - 1_kitten_sleeping
+    - 2_kitten_pouncing
+    - 3_kitten_rolling
 
-- input_img: data/imgs/flowers.png
-  source_prompt: A vase filled with a beautiful bouquet of pink, red and white flowers.
+- input_img: data/imgs/cat_and_dog.png
+  source_prompt: A dog and a cat sitting together on a sidewalk. The dog is positioned on the left side of the scene, while the cat is on the right side. Both animals appear to be relaxed and enjoying each other''s company.
   target_prompts:
-    - A vase filled with a beautiful bouquet of blue, purple and yellow flowers.
-    - A green glass vase filled with a beautiful bouquet of pink, red and white flowers.
+    - A dog and a cat made out of lego sitting together on a sidewalk. The lego dog is positioned on the left side of the scene, while the lego cat is on the right side. Both animals appear to be relaxed and enjoying each other''s company.
+    - A bronze sculpture of a dog and a cat sitting together on a sidewalk. The dog is positioned on the left side of the scene, while the cat is on the right side. Both animals appear to be relaxed and enjoying each other''s company.
   target_codes:
-    - 1_blue_purple_yellow
-    - 2_green_vase
+    - 1_lego
+    - 2_bronze
 
-- input_img: data/imgs/boat_silhouette.png
-  source_prompt:
-    A serene scene of a lake with a silhouette of a sailboat floating on the water.
-    The silhouette of the boat is positioned in the middle of the lake, slightly to the left. The sun is setting in the background, casting a warm glow over the scene.
+- input_img: data/imgs/cat_stone.png
+  source_prompt: A small gray kitten sitting on a stone ledge. The ledge is located near a wall, and there is a cement block nearby.
   target_prompts:
-    - A serene scene of a wide river with a silhouette of a sailboat floating on the water. The silhouette of the boat is positioned in the middle of the river, slightly to the left. The sun is setting in the background, casting a warm glow over the scene.
-    - A serene scene of a lake with a silhouette of a sailboat floating on the water. The silhouette of the boat is positioned in the middle of the lake, slightly to the left. A full moon is shining in the background, casting a cool blue night glow over the scene.
+    - A small gray kitten stretching out entirely flat on a stone ledge. The ledge is located near a wall, and there is a cement block nearby.
+    - A small gray kitten standing up on its hind legs on a stone ledge. The ledge is located near a wall, and there is a cement block nearby.
   target_codes:
-    - 1_wide_river
-    - 2_moon_blue_glow
+    - 1_kitten_stretching
+    - 2_kitten_standing
 
-- input_img: data/imgs/bus.png
-  source_prompt: A yellow van parked in front of a house, outside a garage. The van is of a classic model. The house has a brown exterior, and there is a tree nearby. There is a spare tire hanged between the headlights of the van.
+- input_img: data/imgs/dogs2.png
+  source_prompt: Two dogs standing on a grassy hillside. One dog positioned to the right of the other. This dog has light brown spots on his face, legs and tail.
   target_prompts:
-    - A light blue van parked in front of a house, outside a garage. The van is of a classic model. The house has a brown exterior, and there is a tree nearby. There is a spare tire hanged between the headlights of the van.
-    - A yellow van parked in front of a house, outside a garage. The van is of a classic model. The house has a bright white exterior, and there is a tree nearby. There is a spare tire hanged between the headlights of the van.
+    - Two dogs sitting obediently on a grassy hillside. One dog positioned to the right of the other. This dog has light brown spots on his face, legs and tail.
+    - Two dogs playfully wrestling on a grassy hillside. One dog positioned to the right of the other. This dog has light brown spots on his face, legs and tail.
+    - Two dogs running fast across a grassy hillside. One dog positioned to the right of the other. This dog has light brown spots on his face, legs and tail.
   target_codes:
-    - 1_blue_van
-    - 2_white_house
+    - 1_dogs_sitting
+    - 2_dogs_wrestling
+    - 3_dogs_running
 
-- input_img: data/imgs/deer_silhouette.png
-  source_prompt: A silhouette of a deer standing on a grassy bank near a lake. The scene is set during sunset, with the sun casting a warm glow over it.
+- input_img: data/imgs/horse.png
+  source_prompt: A white horse running through a grassy field. The horse appears to be galloping, creating a sense of motion and energy in the image. The field is surrounded by a forest, with trees visible in the background. The overall atmosphere of the scene is lively and dynamic, capturing the horse''s freedom and grace as it moves through the natural environment.
   target_prompts:
-    - A silhouette of a deer standing on a rocky cliff near a lake. The scene is set during sunset, with the sun casting a warm glow over it.
-    - A silhouette of a deer standing on a grassy bank near a lake. The scene is set during a foggy morning, with a cool gray mist casting a muted glow over it.
+    - A white horse rearing up high on its hind legs, showcasing its grace and beauty. The field is surrounded by a forest, with trees visible in the background. The overall atmosphere of the scene is lively and dynamic, capturing the horse''s freedom and grace as it moves through the natural environment.
+    - A white horse galloping at full speed, showcasing its grace and beauty. The field is surrounded by a forest, with trees visible in the background. The overall atmosphere of the scene is lively and dynamic, capturing the horse''s freedom and grace as it moves through the natural environment.
+    - A white horse grazing with its head bowed to the ground. The field is surrounded by a forest, with trees visible in the background. The overall atmosphere of the scene is lively and dynamic, capturing the horse''s freedom and grace as it moves through the natural environment.
   target_codes:
-    - 1_rocky_cliff
-    - 2_foggy_morning
-
-- input_img: data/imgs/dog_snow.png
-  source_prompt: A German Shepherd dog standing in a snowy field.
-  target_prompts:
-    - A solid black German Shepherd dog standing in a snowy field.
-    - A German Shepherd dog standing in a vibrant green blooming flower meadow.
-  target_codes:
-    - 1_black_dog
-    - 2_flower_meadow
+    - 1_horse_rearing
+    - 2_horse_galloping
+    - 3_horse_grazing
