@@ -624,9 +624,9 @@ def _save_mask_png(mask_hw: torch.Tensor, out_path: str, out_size: int = 512):
 
 def main():
     parser = argparse.ArgumentParser(description="FocusFlow (masked FlowEdit) for SD3")
-    parser.add_argument("--image", type=str, required=True, help="Path to the input image")
-    parser.add_argument("--prompt_src", type=str, required=True, help="Source prompt describing the input image")
-    parser.add_argument("--prompt_tar", type=str, required=True, help="Target prompt for the edited image")
+    parser.add_argument("--image", type=str, default="data/data_pose/cat_ginger.png", help="Path to the input image")
+    parser.add_argument("--prompt_src", type=str, default="An orange and white cat sitting.", help="Source prompt describing the input image")
+    parser.add_argument("--prompt_tar", type=str, default="A tiger sitting.", help="Target prompt for the edited image")
     parser.add_argument("--negative_prompt", type=str, default="", help="Negative prompt (default: '')")
 
     # Main edit params (mirrors my_FlowEdit.py style)
